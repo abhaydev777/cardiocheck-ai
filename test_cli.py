@@ -1,10 +1,21 @@
+#!/usr/bin/env python3
 """
 CLI Test Utility for Decision Tree Classification & Explainability
 Run directly in the terminal to inspect datasets, train trees, and test sample predictions.
 """
 
-import argparse
 import sys
+import os
+
+# Auto-activate workspace virtual environment if run with global system python
+VENV_PYTHON = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".venv", "bin", "python")
+if os.path.exists(VENV_PYTHON) and sys.executable != VENV_PYTHON:
+    try:
+        import pandas
+    except ImportError:
+        os.execv(VENV_PYTHON, [VENV_PYTHON] + sys.argv)
+
+import argparse
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
