@@ -100,22 +100,60 @@ def run_pipeline(csv_path: str, target_col: str = None, max_depth: int = 3, samp
 
     y_pred = clf.predict(X_test)
     accuracy = accuracy_score(y_test, y_pred)
-
-    print("\n" + "-" * 50)
-    print(f"[2] MODEL PERFORMANCE (max_depth={max_depth})")
-    print("-" * 50)
-    print(f"    • Out-of-Sample Holdout Accuracy: {accuracy * 100:.2f}%")
-    print(f"    • Training Samples: {len(X_train)} | Test Samples: {len(X_test)}")
-    
-    print("\n    Confusion Matrix:")
     cm = confusion_matrix(y_test, y_pred)
-    for row in cm:
-        print(f"      {row}")
+    report_dict = classification_report(y_test, y_pred, target_names=class_names, output_dict=True)
 
-    print("\n    Classification Report:")
-    report_lines = classification_report(y_test, y_pred, target_names=class_names).split("\n")
-    for line in report_lines:
-        print(f"      {line}")
+    print("\n" + "=" * 68)
+    print(f"[2] MODEL PERFORMANCE & PRECISION / RECALL COMPARISON")
+    print("=" * 68)
+    print(f"    • Out-of-Sample Holdout Accuracy: {accuracy * 100:.2f}% (max_depth={max_depth})")
+    print(f"    • Training Samples: {len(X_train)} | Holdout Test Samples: {len(X_test)}")
+    
+    # Side-by-side comparative table
+    hdr_class = "Class Label"
+    hdr_p = "Precision"
+    hdr_r = "Recall"
+    hdr_f1 = "F1-Score"
+    hdr_s = "Support"
+
+    print("\n    ⚖️  SIDE-BY-SIDE CLASS PERFORMANCE BREAKDOWN:")
+    print("    " + "-" * 62)
+    print(f"    {hdr_class:<20} | {hdr_p:<10} | {hdr_r:<10} | {hdr_f1:<8} | {hdr_s}")
+    print("    " + "-" * 62)
+    for c in class_names:
+        p_val = report_dict[c]["precision"] * 100
+        r_val = report_dict[c]["recall"] * 100
+        f1_val = report_dict[c]["f1-score"]
+        supp = int(report_dict[c]["support"])
+        print(f"    {c:<20} | {p_val:>8.1f}% | {r_val:>8.1f}% | {f1_val:>8.2f} | {supp:>7d}")
+    print("    " + "-" * 62)
+
+    if "macro avg" in report_dict:
+        mp = report_dict["macro avg"]["precision"] * 100
+        mr = report_dict["macro avg"]["recall"] * 100
+        mf1 = report_dict["macro avg"]["f1-score"]
+        print(f"    {'Macro Average':<20} | {mp:>8.1f}% | {mr:>8.1f}% | {mf1:>8.2f} | {len(y_test):>7d}")
+        print("    " + "-" * 62)
+
+    # Comparison takeaways for binary classification
+    if len(class_names) == 2:
+        c0, c1 = class_names[0], class_names[1]
+        p0, p1 = report_dict[c0]["precision"] * 100, report_dict[c1]["precision"] * 100
+        r0, r1 = report_dict[c0]["recall"] * 100, report_dict[c1]["recall"] * 100
+        print(f"\n    🔍 Precision vs. Recall Comparison:")
+        print(f"       • Precision (Purity) : {c0} = {p0:.1f}%  vs  {c1} = {p1:.1f}%")
+        print(f"       • Recall (Coverage)  : {c0} = {r0:.1f}%  vs  {c1} = {r1:.1f}%")
+        higher_recall = c0 if r0 > r1 else c1
+        lower_recall = c1 if r0 > r1 else c0
+        print(f"       • Takeaway: The model detects '{higher_recall}' with higher sensitivity ({max(r0, r1):.1f}%),")
+        print(f"         while '{lower_recall}' achieves {min(r0, r1):.1f}% coverage.")
+
+    print("\n    Confusion Matrix (Actual Rows vs Predicted Columns):")
+    hdr_cm = "  ".join([f"Pred_{str(c)[:6]:>7}" for c in class_names])
+    print(f"                 {hdr_cm}")
+    for i, row in enumerate(cm):
+        row_str = "  ".join([f"{val:>12d}" for val in row])
+        print(f"      Actual_{str(class_names[i])[:6]:<6}: {row_str}")
 
     # 4. Text Decision Tree Architecture
     print("-" * 50)

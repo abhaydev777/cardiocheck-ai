@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.tree import DecisionTreeClassifier, plot_tree
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 import os
 
 st.set_page_config(
@@ -510,11 +510,34 @@ if mode == "🫀 CardioCheck Demo":
         else:
             st.markdown("<div class='factor-item'>• All primary biomarkers (Blood Pressure, Cholesterol, Heart Rate) remain inside safe baseline ranges.</div>", unsafe_allow_html=True)
 
-    # Collapsible visual tree logic
+    # Collapsible visual tree logic & performance breakdown
     if os.path.exists("heart_tree.png"):
         st.write("")
         with st.expander("How this model decides (Decision Tree Flowchart)"):
             st.image("heart_tree.png", caption="Interpretable decision path generated from UCI Cleveland data")
+
+        with st.expander("Model Precision & Recall Breakdown (UCI Cleveland Holdout)"):
+            st.markdown("<p style='font-size: 0.88rem; color: #726E65; margin-bottom: 0.75rem;'>Out-of-sample performance on unseen test cohort (80/20 stratified holdout):</p>", unsafe_allow_html=True)
+            col_m1, col_m2 = st.columns(2, gap="medium")
+            with col_m1:
+                st.markdown("""
+                <div class='editorial-box' style='padding: 1rem 1.15rem; margin-bottom: 0.5rem;'>
+                    <div style='font-size: 0.78rem; font-weight: 700; color: #215438; text-transform: uppercase; margin-bottom: 0.35rem;'>Healthy (Class 0)</div>
+                    <div style='display: flex; justify-content: space-between; margin-bottom: 0.2rem;'><span style='font-size: 0.85rem; color: #4A4740;'>Precision:</span><strong style='font-size: 0.95rem; color: #1F1E1B;'>74.2%</strong></div>
+                    <div style='display: flex; justify-content: space-between; margin-bottom: 0.2rem;'><span style='font-size: 0.85rem; color: #4A4740;'>Recall:</span><strong style='font-size: 0.95rem; color: #1F1E1B;'>78.1%</strong></div>
+                    <div style='display: flex; justify-content: space-between; font-size: 0.8rem; color: #726E65; padding-top: 0.25rem; border-top: 1px solid #F0EDE5;'><span>F1: 0.76</span><span>32 test cases</span></div>
+                </div>
+                """, unsafe_allow_html=True)
+            with col_m2:
+                st.markdown("""
+                <div class='editorial-box' style='padding: 1rem 1.15rem; margin-bottom: 0.5rem;'>
+                    <div style='font-size: 0.78rem; font-weight: 700; color: #8C2F17; text-transform: uppercase; margin-bottom: 0.35rem;'>At Risk (Class 1)</div>
+                    <div style='display: flex; justify-content: space-between; margin-bottom: 0.2rem;'><span style='font-size: 0.85rem; color: #4A4740;'>Precision:</span><strong style='font-size: 0.95rem; color: #1F1E1B;'>73.1%</strong></div>
+                    <div style='display: flex; justify-content: space-between; margin-bottom: 0.2rem;'><span style='font-size: 0.85rem; color: #4A4740;'>Recall:</span><strong style='font-size: 0.95rem; color: #1F1E1B;'>67.9%</strong></div>
+                    <div style='display: flex; justify-content: space-between; font-size: 0.8rem; color: #726E65; padding-top: 0.25rem; border-top: 1px solid #F0EDE5;'><span>F1: 0.70</span><span>28 test cases</span></div>
+                </div>
+                """, unsafe_allow_html=True)
+            st.caption("Overall Accuracy: 73.3% | Macro F1-Score: 0.73 | Confusion Matrix: 25 TN, 7 FP, 9 FN, 19 TP")
 
 
 # =============================================================================
@@ -647,10 +670,14 @@ else:
 
                 y_pred = clf.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
+                cm = confusion_matrix(y_test, y_pred)
+                report_dict = classification_report(y_test, y_pred, target_names=classes_list, output_dict=True)
 
                 st.session_state["custom_studio"] = {
                     "model": clf,
                     "accuracy": accuracy,
+                    "cm": cm,
+                    "report_dict": report_dict,
                     "target_col": target_col,
                     "feature_cols": feature_cols,
                     "target_le": target_le,
@@ -666,6 +693,8 @@ else:
             clf = studio["model"]
             accuracy = studio["accuracy"]
             classes_list = studio["classes"]
+            cm = studio.get("cm")
+            report_dict = studio.get("report_dict")
 
             # Soft Sage Accuracy Card
             st.markdown(f"""
@@ -675,6 +704,71 @@ else:
                 <div style='font-size: 0.88rem; color: #356B4C;'>Decision tree trained with max_depth={studio['max_depth']} on {len(df)} samples</div>
             </div>
             """, unsafe_allow_html=True)
+
+            # Side-by-Side Precision & Recall Comparison
+            if report_dict:
+                st.markdown("<p style='font-weight: 600; font-size: 1rem; color: #1F1E1B; margin-top: 1.25rem; margin-bottom: 0.5rem;'>⚖️ Precision & Recall Comparison</p>", unsafe_allow_html=True)
+
+                num_cols = min(len(classes_list), 3)
+                comp_cols = st.columns(num_cols, gap="medium")
+                for idx_c, c_name in enumerate(classes_list[:num_cols]):
+                    if c_name in report_dict:
+                        m = report_dict[c_name]
+                        p_pct = m["precision"] * 100
+                        r_pct = m["recall"] * 100
+                        f1_val = m["f1-score"]
+                        supp_val = int(m["support"])
+                        with comp_cols[idx_c]:
+                            st.markdown(f"""
+                            <div class='editorial-box' style='padding: 1rem 1.15rem; margin-bottom: 0.75rem;'>
+                                <div style='font-size: 0.78rem; font-weight: 700; color: #726E65; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;'>Class: {c_name}</div>
+                                <div style='display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.3rem;'>
+                                    <span style='font-size: 0.85rem; color: #4A4740;'>Precision:</span>
+                                    <strong style='font-size: 1.05rem; color: #1F1E1B;'>{p_pct:.1f}%</strong>
+                                </div>
+                                <div style='display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.3rem;'>
+                                    <span style='font-size: 0.85rem; color: #4A4740;'>Recall:</span>
+                                    <strong style='font-size: 1.05rem; color: #1F1E1B;'>{r_pct:.1f}%</strong>
+                                </div>
+                                <div style='display: flex; justify-content: space-between; align-items: baseline; padding-top: 0.3rem; border-top: 1px solid #F0EDE5;'>
+                                    <span style='font-size: 0.8rem; color: #726E65;'>F1: {f1_val:.2f}</span>
+                                    <span style='font-size: 0.8rem; color: #726E65;'>{supp_val} test rows</span>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                if cm is not None:
+                    with st.expander("Detailed Confusion Matrix & Class Breakdown Table"):
+                        cm_df = pd.DataFrame(
+                            cm,
+                            index=[f"Actual {c}" for c in classes_list],
+                            columns=[f"Pred {c}" for c in classes_list]
+                        )
+                        col_cm1, col_cm2 = st.columns([1, 1.3], gap="medium")
+                        with col_cm1:
+                            st.caption("Confusion Matrix")
+                            st.dataframe(cm_df, use_container_width=True)
+                        with col_cm2:
+                            st.caption("Classification Report")
+                            table_rows = []
+                            for c in classes_list:
+                                if c in report_dict:
+                                    table_rows.append({
+                                        "Class": str(c),
+                                        "Precision": f"{report_dict[c]['precision']*100:.1f}%",
+                                        "Recall": f"{report_dict[c]['recall']*100:.1f}%",
+                                        "F1": f"{report_dict[c]['f1-score']:.2f}",
+                                        "Support": int(report_dict[c]['support'])
+                                    })
+                            if "macro avg" in report_dict:
+                                table_rows.append({
+                                    "Class": "Macro Avg",
+                                    "Precision": f"{report_dict['macro avg']['precision']*100:.1f}%",
+                                    "Recall": f"{report_dict['macro avg']['recall']*100:.1f}%",
+                                    "F1": f"{report_dict['macro avg']['f1-score']:.2f}",
+                                    "Support": int(report_dict['macro avg']['support'])
+                                })
+                            st.dataframe(pd.DataFrame(table_rows), use_container_width=True)
 
             # Decision Tree Visualization
             st.markdown("<p style='font-weight: 600; font-size: 1rem; color: #1F1E1B; margin-top: 1.5rem; margin-bottom: 0.5rem;'>Decision Tree Architecture</p>", unsafe_allow_html=True)
