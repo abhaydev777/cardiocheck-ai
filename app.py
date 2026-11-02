@@ -611,7 +611,7 @@ else:
 
                 for col in feature_cols:
                     series = X_raw[col]
-                    is_cat = series.dtype == "object" or series.dtype.name == "category" or str(series.dtype) == "bool"
+                    is_cat = not pd.api.types.is_numeric_dtype(series)
 
                     if is_cat:
                         mode_val = series.mode()[0] if not series.mode().empty else "Missing"
